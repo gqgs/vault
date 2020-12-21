@@ -1,7 +1,5 @@
 use std::fmt;
-use string;
 use string::StaticStr;
-
 use state::UpdateMsg;
 use state::Updater;
 
@@ -18,7 +16,7 @@ impl fmt::Display for Iterations {
     }
 }
 
-impl string::StaticStr for Iterations {
+impl StaticStr for Iterations {
     fn as_static_str(&self) -> &'static str {
         match self {
             Iterations::LOW => "LOW",

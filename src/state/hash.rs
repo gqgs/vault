@@ -1,7 +1,5 @@
 use std::fmt;
-use string;
 use string::StaticStr;
-
 use state::UpdateMsg;
 use state::Updater;
 
@@ -17,13 +15,14 @@ pub enum Hash {
     SHA3_384,
     SHA3_512,
 }
+
 impl fmt::Display for Hash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.as_static_str())
     }
 }
 
-impl string::StaticStr for Hash {
+impl StaticStr for Hash {
     fn as_static_str(&self) -> &'static str {
         match self {
             Hash::RIPEMD160 => "RIPEMD-160",

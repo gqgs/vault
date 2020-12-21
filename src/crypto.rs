@@ -12,6 +12,7 @@ use state::cipher::Cipher;
 use state::hash::Hash;
 use state::iterations::Iterations;
 
+#[inline]
 fn xor(v1: &[u8], v2: &[u8], res: &mut [u8]) {
     assert_eq!(v1.len(), v2.len());
     let len = v1.len();
@@ -75,10 +76,8 @@ pub fn encrypt(
         Cipher::SALSA20 => Box::new(salsa20::Salsa20::new(key_slice, &iv[0..8])),
     };
 
-    match cipher!(plaintext, encryptor, encrypt) {
-        Ok(ciphertext) => return Ok((salt, ciphertext)),
-        Err(err) => return Err(err),
-    };
+    let ciphertext = cipher!(plaintext, encryptor, encrypt)?;
+    Ok((salt, ciphertext))
 }
 
 pub fn decrypt(

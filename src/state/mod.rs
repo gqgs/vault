@@ -1,7 +1,6 @@
 use std::fmt;
 use std::fs::File;
 use std::io::prelude::*;
-
 use crypto;
 use editor;
 
