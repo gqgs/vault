@@ -20,6 +20,31 @@ fn xor(v1: &[u8], v2: &[u8], res: &mut [u8]) {
     }
 }
 
+macro_rules! cipher {
+    ($data:ident,$func:ident,$op:ident) => {{
+        let mut final_result = Vec::<u8>::new();
+        let mut read_buffer = buffer::RefReadBuffer::new($data);
+        let mut buffer = [0; 4096];
+        let mut write_buffer = buffer::RefWriteBuffer::new(&mut buffer);
+
+        loop {
+            let result = $func.$op(&mut read_buffer, &mut write_buffer, true)?;
+            final_result.extend(
+                write_buffer
+                    .take_read_buffer()
+                    .take_remaining()
+                    .iter()
+                    .map(|&i| i),
+            );
+            match result {
+                BufferResult::BufferUnderflow => break,
+                BufferResult::BufferOverflow => {}
+            }
+        }
+        Ok(final_result)
+    }};
+}
+
 pub fn encrypt(
     cipher: Cipher,
     hash: Hash,
@@ -33,13 +58,27 @@ pub fn encrypt(
 
     rng.fill_bytes(&mut salt);
     hmac_digest_all(hash, key, &salt, iterations, &mut derived_key);
+
     let mut iv: [u8; 16] = [0; 16];
     xor(&salt, &derived_key[0..16], &mut iv);
 
-    match _encrypt(cipher, plaintext, &derived_key[16..48], &iv) {
+    let key_slice = &derived_key[16..48];
+
+    let mut encryptor = match cipher {
+        Cipher::AESCBC => aes::cbc_encryptor(
+            aes::KeySize::KeySize256,
+            key_slice,
+            &iv,
+            blockmodes::PkcsPadding,
+        ),
+        Cipher::CHACHA20 => Box::new(chacha20::ChaCha20::new(key_slice, &iv[0..12])),
+        Cipher::SALSA20 => Box::new(salsa20::Salsa20::new(key_slice, &iv[0..8])),
+    };
+
+    match cipher!(plaintext, encryptor, encrypt) {
         Ok(ciphertext) => return Ok((salt, ciphertext)),
-        Err(err) => Err(err),
-    }
+        Err(err) => return Err(err),
+    };
 }
 
 pub fn decrypt(
@@ -50,15 +89,29 @@ pub fn decrypt(
     data: Vec<u8>,
 ) -> Result<Vec<u8>, symmetriccipher::SymmetricCipherError> {
     let mut derived_key: [u8; 48] = [0; 48]; // 384bits
-
     assert!(data.len() > 16);
     let (salt, ciphertext) = data.split_at(16);
+
     hmac_digest_all(hash, key, salt, iterations, &mut derived_key);
 
     let mut iv: [u8; 16] = [0; 16];
     xor(&salt, &derived_key[0..16], &mut iv);
 
-    _decrypt(cipher, &ciphertext[..], &derived_key[16..48], &iv)
+    let encrypted_text = &ciphertext[..];
+    let key_slice = &derived_key[16..48];
+
+    let mut decryptor = match cipher {
+        Cipher::AESCBC => aes::cbc_decryptor(
+            aes::KeySize::KeySize256,
+            key_slice,
+            &iv,
+            blockmodes::PkcsPadding,
+        ),
+        Cipher::CHACHA20 => Box::new(chacha20::ChaCha20::new(key_slice, &iv[0..12])),
+        Cipher::SALSA20 => Box::new(salsa20::Salsa20::new(key_slice, &iv[0..8])),
+    };
+
+    cipher!(encrypted_text, decryptor, decrypt)
 }
 
 macro_rules! hmac_digest {
@@ -91,61 +144,4 @@ fn hmac_digest_all(
         Hash::SHA3_384 => hmac_digest!(Sha3::new(Sha3Mode::Sha3_384), key, salt, iter, derived_key),
         Hash::SHA3_512 => hmac_digest!(Sha3::new(Sha3Mode::Sha3_512), key, salt, iter, derived_key),
     }
-}
-
-macro_rules! cipher {
-    ($data:ident,$func:ident,$op:ident) => {{
-        let mut final_result = Vec::<u8>::new();
-        let mut read_buffer = buffer::RefReadBuffer::new($data);
-        let mut buffer = [0; 4096];
-        let mut write_buffer = buffer::RefWriteBuffer::new(&mut buffer);
-
-        loop {
-            let result = $func.$op(&mut read_buffer, &mut write_buffer, true)?;
-            final_result.extend(
-                write_buffer
-                    .take_read_buffer()
-                    .take_remaining()
-                    .iter()
-                    .map(|&i| i),
-            );
-            match result {
-                BufferResult::BufferUnderflow => break,
-                BufferResult::BufferOverflow => {}
-            }
-        }
-        Ok(final_result)
-    }};
-}
-
-fn _encrypt(
-    cipher: Cipher,
-    data: &[u8],
-    key: &[u8],
-    iv: &[u8],
-) -> Result<Vec<u8>, symmetriccipher::SymmetricCipherError> {
-    let mut encryptor = match cipher {
-        Cipher::AESCBC => {
-            aes::cbc_encryptor(aes::KeySize::KeySize256, key, iv, blockmodes::PkcsPadding)
-        }
-        Cipher::CHACHA20 => Box::new(chacha20::ChaCha20::new(key, &iv[0..12])),
-        Cipher::SALSA20 => Box::new(salsa20::Salsa20::new(key, &iv[0..8])),
-    };
-    cipher!(data, encryptor, encrypt)
-}
-
-fn _decrypt(
-    cipher: Cipher,
-    encrypted_data: &[u8],
-    key: &[u8],
-    iv: &[u8],
-) -> Result<Vec<u8>, symmetriccipher::SymmetricCipherError> {
-    let mut decryptor = match cipher {
-        Cipher::AESCBC => {
-            aes::cbc_decryptor(aes::KeySize::KeySize256, key, iv, blockmodes::PkcsPadding)
-        }
-        Cipher::CHACHA20 => Box::new(chacha20::ChaCha20::new(key, &iv[0..12])),
-        Cipher::SALSA20 => Box::new(salsa20::Salsa20::new(key, &iv[0..8])),
-    };
-    cipher!(encrypted_data, decryptor, decrypt)
 }
