@@ -55,7 +55,7 @@ pub struct Editor {
 impl Editor {
     pub fn new() -> Editor {
         let (sender, r) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
-        let state: state::State = Default::default();
+        let state = state::State::new();
         Editor {
             sender,
             label: Label::new(Some(&state.to_string())),

@@ -33,6 +33,10 @@ pub enum UpdateMsg {
 }
 
 impl State {
+    pub fn new() -> State {
+        Default::default()
+    }
+
     fn set_hash(&mut self, hash: Hash) {
         self.hash = hash;
     }
