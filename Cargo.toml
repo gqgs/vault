@@ -1,0 +1,18 @@
+[package]
+name = "vault"
+version = "0.1.0"
+authors = ["Guilherme <gqgs@protonmail.com>"]
+
+[dependencies]
+rust-crypto = "0.2.36"
+rand = "0.7.3"
+gdk-pixbuf = "0.9.0"
+glib = "0.10.3"
+
+[dependencies.gtk]
+version = "0.9.0"
+features = ["v3_22"]
+
+[dependencies.gio]
+version = ""
+features = ["v2_64"]
