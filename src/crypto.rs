@@ -10,8 +10,8 @@ use cryptolib::sha3::{Sha3, Sha3Mode};
 use cryptolib::{aes, blockmodes, buffer, chacha20, salsa20, symmetriccipher};
 use rand::{thread_rng, RngCore};
 use state::cipher::Cipher;
+use state::cost::Cost;
 use state::hash::Hash;
-use state::iterations::Iterations;
 use state::kdf::{KDFCost, KDF};
 
 #[cfg(test)]
@@ -21,13 +21,13 @@ mod tests {
     fn test_encrypt() {
         for cipher in vec![Cipher::AESCBC, Cipher::CHACHA20, Cipher::SALSA20] {
             for hash in vec![Hash::RIPEMD160, Hash::BLAKE2B, Hash::BLAKE2S] {
-                for iter in vec![Iterations::LOW] {
+                for cost in vec![Cost::LOW] {
                     for kdf in vec![KDF::PBKDF2, KDF::ARGON2] {
-                        println!("testing: {} {} {} {}", cipher, hash, iter, kdf);
+                        println!("testing: {} {} {} {}", cipher, hash, cost, kdf);
                         let (salt, ciphertext) = encrypt(
                             cipher,
                             hash,
-                            iter,
+                            cost,
                             kdf,
                             String::from("hello"),
                             &"secret".as_bytes(),
@@ -37,7 +37,7 @@ mod tests {
                         c.append(&mut salt[..].to_vec());
                         c.extend(ciphertext);
                         let res =
-                            decrypt(cipher, hash, iter, kdf, String::from("hello"), c).unwrap();
+                            decrypt(cipher, hash, cost, kdf, String::from("hello"), c).unwrap();
                         assert_eq!(&res.as_slice(), &"secret".as_bytes());
                     }
                 }
@@ -83,7 +83,7 @@ macro_rules! cipher {
 pub fn encrypt(
     cipher: Cipher,
     hash: Hash,
-    iterations: Iterations,
+    cost: Cost,
     kdf: KDF,
     key: String,
     plaintext: &[u8],
@@ -93,7 +93,7 @@ pub fn encrypt(
     let mut derived_key: [u8; 48] = [0; 48]; // 384bits
 
     rng.fill_bytes(&mut salt);
-    derive_key(hash, kdf, key, &salt, iterations, &mut derived_key);
+    derive_key(hash, kdf, key, &salt, cost, &mut derived_key);
 
     let mut iv: [u8; 16] = [0; 16];
     xor(&salt, &derived_key[0..16], &mut iv);
@@ -118,7 +118,7 @@ pub fn encrypt(
 pub fn decrypt(
     cipher: Cipher,
     hash: Hash,
-    iterations: Iterations,
+    cost: Cost,
     kdf: KDF,
     key: String,
     data: Vec<u8>,
@@ -127,7 +127,7 @@ pub fn decrypt(
     assert!(data.len() > 16);
     let (salt, ciphertext) = data.split_at(16);
 
-    derive_key(hash, kdf, key, salt, iterations, &mut derived_key);
+    derive_key(hash, kdf, key, salt, cost, &mut derived_key);
 
     let mut iv: [u8; 16] = [0; 16];
     xor(&salt, &derived_key[0..16], &mut iv);
@@ -156,31 +156,24 @@ macro_rules! hmac_digest {
     }};
 }
 
-fn derive_key(
-    hash: Hash,
-    kdf: KDF,
-    key: String,
-    salt: &[u8],
-    iterations: Iterations,
-    derived_key: &mut [u8],
-) {
-    match kdf.cost(iterations) {
-        KDFCost::PBKDF2(iter) => {
+fn derive_key(hash: Hash, kdf: KDF, key: String, salt: &[u8], cost: Cost, derived_key: &mut [u8]) {
+    match kdf.cost(cost) {
+        KDFCost::PBKDF2(cost) => {
             match hash {
-                Hash::RIPEMD160 => hmac_digest!(Ripemd160::new(), key, salt, iter, derived_key),
-                Hash::BLAKE2S => hmac_digest!(Blake2s::new(32), key, salt, iter, derived_key), // 256bits
-                Hash::BLAKE2B => hmac_digest!(Blake2b::new(64), key, salt, iter, derived_key), // 512bits
-                Hash::SHA2_256 => hmac_digest!(Sha256::new(), key, salt, iter, derived_key),
-                Hash::SHA2_384 => hmac_digest!(Sha384::new(), key, salt, iter, derived_key),
-                Hash::SHA2_512 => hmac_digest!(Sha512::new(), key, salt, iter, derived_key),
+                Hash::RIPEMD160 => hmac_digest!(Ripemd160::new(), key, salt, cost, derived_key),
+                Hash::BLAKE2S => hmac_digest!(Blake2s::new(32), key, salt, cost, derived_key), // 256bits
+                Hash::BLAKE2B => hmac_digest!(Blake2b::new(64), key, salt, cost, derived_key), // 512bits
+                Hash::SHA2_256 => hmac_digest!(Sha256::new(), key, salt, cost, derived_key),
+                Hash::SHA2_384 => hmac_digest!(Sha384::new(), key, salt, cost, derived_key),
+                Hash::SHA2_512 => hmac_digest!(Sha512::new(), key, salt, cost, derived_key),
                 Hash::SHA3_256 => {
-                    hmac_digest!(Sha3::new(Sha3Mode::Sha3_256), key, salt, iter, derived_key)
+                    hmac_digest!(Sha3::new(Sha3Mode::Sha3_256), key, salt, cost, derived_key)
                 }
                 Hash::SHA3_384 => {
-                    hmac_digest!(Sha3::new(Sha3Mode::Sha3_384), key, salt, iter, derived_key)
+                    hmac_digest!(Sha3::new(Sha3Mode::Sha3_384), key, salt, cost, derived_key)
                 }
                 Hash::SHA3_512 => {
-                    hmac_digest!(Sha3::new(Sha3Mode::Sha3_512), key, salt, iter, derived_key)
+                    hmac_digest!(Sha3::new(Sha3Mode::Sha3_512), key, salt, cost, derived_key)
                 }
             }
         }

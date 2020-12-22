@@ -5,20 +5,20 @@ use std::fs::File;
 use std::io::prelude::*;
 
 use self::cipher::Cipher;
+use self::cost::Cost;
 use self::hash::Hash;
-use self::iterations::Iterations;
 use self::kdf::KDF;
 
 pub mod cipher;
+pub mod cost;
 pub mod hash;
-pub mod iterations;
 pub mod kdf;
 
 #[derive(Default)]
 pub struct State {
     hash: Hash,
     cipher: Cipher,
-    iterations: Iterations,
+    cost: Cost,
     kdf: KDF,
 }
 
@@ -33,7 +33,7 @@ pub enum Action {
 pub enum UpdateMsg {
     Hash(Hash),
     Cipher(Cipher),
-    Iterations(Iterations),
+    Cost(Cost),
     KDF(KDF),
 }
 
@@ -50,8 +50,8 @@ impl State {
         self.cipher = cipher;
     }
 
-    fn set_iterations(&mut self, iterations: Iterations) {
-        self.iterations = iterations;
+    fn set_cost(&mut self, cost: Cost) {
+        self.cost = cost;
     }
 
     fn set_kdf(&mut self, kdf: KDF) {
@@ -62,7 +62,7 @@ impl State {
         match updatemsg {
             UpdateMsg::Hash(hash) => self.set_hash(hash),
             UpdateMsg::Cipher(cipher) => self.set_cipher(cipher),
-            UpdateMsg::Iterations(iterations) => self.set_iterations(iterations),
+            UpdateMsg::Cost(cost) => self.set_cost(cost),
             UpdateMsg::KDF(kdf) => self.set_kdf(kdf),
         }
     }
@@ -73,7 +73,7 @@ impl State {
                 match crypto::encrypt(
                     self.cipher,
                     self.hash,
-                    self.iterations,
+                    self.cost,
                     self.kdf,
                     key,
                     &plaintext.into_bytes(),
@@ -99,14 +99,9 @@ impl State {
                 None
             }
             Action::Decrypt(key, content) => {
-                if let Ok(plain_utf8) = crypto::decrypt(
-                    self.cipher,
-                    self.hash,
-                    self.iterations,
-                    self.kdf,
-                    key,
-                    content,
-                ) {
+                if let Ok(plain_utf8) =
+                    crypto::decrypt(self.cipher, self.hash, self.cost, self.kdf, key, content)
+                {
                     if let Ok(plaintext) = String::from_utf8(plain_utf8) {
                         return Some(editor::Action::UpdateTextView(plaintext));
                     }
@@ -124,11 +119,11 @@ pub trait Updater {
 impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kdf {
-            KDF::ARGON2 => write!(f, "{} | {} | {}", self.cipher, self.iterations, self.kdf),
+            KDF::ARGON2 => write!(f, "{} | {} | {}", self.cipher, self.cost, self.kdf),
             _ => write!(
                 f,
                 "{} | {} | {} | {}",
-                self.cipher, self.hash, self.iterations, self.kdf
+                self.cipher, self.hash, self.cost, self.kdf
             ),
         }
     }

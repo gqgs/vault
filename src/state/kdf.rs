@@ -1,4 +1,4 @@
-use state::iterations::Iterations;
+use state::cost::Cost;
 use state::UpdateMsg;
 use state::Updater;
 use std::fmt;
@@ -11,7 +11,7 @@ pub enum KDF {
 }
 
 pub enum KDFCost {
-    // iterations
+    // Cost
     PBKDF2(u32),
     // mem cost, time cost
     ARGON2(u32, u32),
@@ -45,17 +45,17 @@ impl Default for KDF {
 }
 
 impl KDF {
-    pub fn cost(&self, iterations: Iterations) -> KDFCost {
+    pub fn cost(&self, cost: Cost) -> KDFCost {
         match self {
-            KDF::PBKDF2 => match iterations {
-                Iterations::LOW => KDFCost::PBKDF2(10_000),
-                Iterations::MEDIUM => KDFCost::PBKDF2(100_000),
-                Iterations::HIGH => KDFCost::PBKDF2(1_000_000),
+            KDF::PBKDF2 => match cost {
+                Cost::LOW => KDFCost::PBKDF2(10_000),
+                Cost::MEDIUM => KDFCost::PBKDF2(100_000),
+                Cost::HIGH => KDFCost::PBKDF2(1_000_000),
             },
-            KDF::ARGON2 => match iterations {
-                Iterations::LOW => KDFCost::ARGON2(u32::pow(2, 10), 2),
-                Iterations::MEDIUM => KDFCost::ARGON2(u32::pow(2, 20), 5),
-                Iterations::HIGH => KDFCost::ARGON2(u32::pow(2, 24), 10),
+            KDF::ARGON2 => match cost {
+                Cost::LOW => KDFCost::ARGON2(u32::pow(2, 10), 2),
+                Cost::MEDIUM => KDFCost::ARGON2(u32::pow(2, 20), 5),
+                Cost::HIGH => KDFCost::ARGON2(u32::pow(2, 22), 10),
             },
         }
     }

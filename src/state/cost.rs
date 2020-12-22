@@ -4,36 +4,36 @@ use std::fmt;
 use string::StaticStr;
 
 #[derive(Copy, Clone)]
-pub enum Iterations {
+pub enum Cost {
     LOW,
     MEDIUM,
     HIGH,
 }
 
-impl fmt::Display for Iterations {
+impl fmt::Display for Cost {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.as_static_str())
     }
 }
 
-impl StaticStr for Iterations {
+impl StaticStr for Cost {
     fn as_static_str(&self) -> &'static str {
         match self {
-            Iterations::LOW => "LOW",
-            Iterations::MEDIUM => "MEDIUM",
-            Iterations::HIGH => "HIGH",
+            Cost::LOW => "LOW",
+            Cost::MEDIUM => "MEDIUM",
+            Cost::HIGH => "HIGH",
         }
     }
 }
 
-impl Updater for Iterations {
+impl Updater for Cost {
     fn update(&self) -> UpdateMsg {
-        UpdateMsg::Iterations(*self)
+        UpdateMsg::Cost(*self)
     }
 }
 
-impl Default for Iterations {
+impl Default for Cost {
     fn default() -> Self {
-        Iterations::MEDIUM
+        Cost::MEDIUM
     }
 }

@@ -13,8 +13,8 @@ use std::io::prelude::*;
 use std::rc::Rc;
 
 use state::cipher::Cipher;
+use state::cost::Cost;
 use state::hash::Hash;
-use state::iterations::Iterations;
 use state::kdf::KDF;
 
 use config;
@@ -114,13 +114,13 @@ impl Editor {
         cipher.set_submenu(Some(&ciphermenu));
         menu.append(&cipher);
 
-        let itermenu = Menu::new();
-        let iter = MenuItem::with_label("Iterations");
-        itermenu.append(&self.new_menu_item(Iterations::LOW));
-        itermenu.append(&self.new_menu_item(Iterations::MEDIUM));
-        itermenu.append(&self.new_menu_item(Iterations::HIGH));
-        iter.set_submenu(Some(&itermenu));
-        menu.append(&iter);
+        let costmenu = Menu::new();
+        let cost = MenuItem::with_label("Cost");
+        costmenu.append(&self.new_menu_item(Cost::LOW));
+        costmenu.append(&self.new_menu_item(Cost::MEDIUM));
+        costmenu.append(&self.new_menu_item(Cost::HIGH));
+        cost.set_submenu(Some(&costmenu));
+        menu.append(&cost);
 
         let hashmenu = Menu::new();
         let hash = MenuItem::with_label("Hash");
