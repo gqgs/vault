@@ -79,7 +79,7 @@ impl Editor {
     }
 
     pub fn run(&self, application: &gtk::Application) {
-        let icon = Pixbuf::from_file(config::ICON).unwrap();
+        let icon = Pixbuf::from_inline(config::ICON, false).unwrap();
         let window = gtk::ApplicationWindow::new(application);
         window.set_title(config::TITLE);
         window.set_position(WindowPosition::Center);
