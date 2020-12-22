@@ -14,6 +14,38 @@ use state::hash::Hash;
 use state::iterations::Iterations;
 use state::kdf::{KDFCost, KDF};
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_encrypt() {
+        for cipher in vec![Cipher::AESCBC, Cipher::CHACHA20, Cipher::SALSA20] {
+            for hash in vec![Hash::RIPEMD160, Hash::BLAKE2B, Hash::BLAKE2S] {
+                for iter in vec![Iterations::LOW] {
+                    for kdf in vec![KDF::PBKDF2, KDF::ARGON2] {
+                        println!("testing: {} {} {} {}", cipher, hash, iter, kdf);
+                        let (salt, ciphertext) = encrypt(
+                            cipher,
+                            hash,
+                            iter,
+                            kdf,
+                            String::from("hello"),
+                            &"secret".as_bytes(),
+                        )
+                        .unwrap();
+                        let mut c: std::vec::Vec<u8> = std::vec::Vec::new();
+                        c.append(&mut salt[..].to_vec());
+                        c.extend(ciphertext);
+                        let res =
+                            decrypt(cipher, hash, iter, kdf, String::from("hello"), c).unwrap();
+                        assert_eq!(&res.as_slice(), &"secret".as_bytes());
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[inline]
 fn xor(v1: &[u8], v2: &[u8], res: &mut [u8]) {
     assert_eq!(v1.len(), v2.len());
@@ -154,7 +186,7 @@ fn derive_key(
         }
         KDFCost::ARGON2(mem_cost, time_cost) => {
             let config = argon2::Config {
-                variant: argon2::Variant::Argon2d,
+                variant: argon2::Variant::Argon2i,
                 version: argon2::Version::Version13,
                 mem_cost,
                 time_cost,

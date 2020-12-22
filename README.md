@@ -19,3 +19,8 @@ cargo build --release
 cargo install
 ```
 
+### Test
+
+```
+cargo test -- --nocapture
+```

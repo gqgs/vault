@@ -53,9 +53,9 @@ impl KDF {
                 Iterations::HIGH => KDFCost::PBKDF2(1_000_000),
             },
             KDF::ARGON2 => match iterations {
-                Iterations::LOW => KDFCost::ARGON2(65536, 10),
-                Iterations::MEDIUM => KDFCost::ARGON2(65536, 10),
-                Iterations::HIGH => KDFCost::ARGON2(65536, 10),
+                Iterations::LOW => KDFCost::ARGON2(u32::pow(2, 10), 2),
+                Iterations::MEDIUM => KDFCost::ARGON2(u32::pow(2, 20), 5),
+                Iterations::HIGH => KDFCost::ARGON2(u32::pow(2, 24), 10),
             },
         }
     }
