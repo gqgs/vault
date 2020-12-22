@@ -1,3 +1,4 @@
+extern crate argon2;
 extern crate crypto as cryptolib;
 extern crate gdk_pixbuf;
 extern crate gio;

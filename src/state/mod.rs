@@ -1,26 +1,31 @@
+use crypto;
+use editor;
 use std::fmt;
 use std::fs::File;
 use std::io::prelude::*;
-use crypto;
-use editor;
 
 use self::cipher::Cipher;
 use self::hash::Hash;
 use self::iterations::Iterations;
+use self::kdf::KDF;
 
 pub mod cipher;
 pub mod hash;
 pub mod iterations;
+pub mod kdf;
 
 #[derive(Default)]
 pub struct State {
     hash: Hash,
     cipher: Cipher,
     iterations: Iterations,
+    kdf: KDF,
 }
 
 pub enum Action {
+    // key, plaintext, path
     Encrypt(String, String, std::path::PathBuf),
+    // key, ciphertext
     Decrypt(String, Vec<u8>),
 }
 
@@ -29,6 +34,7 @@ pub enum UpdateMsg {
     Hash(Hash),
     Cipher(Cipher),
     Iterations(Iterations),
+    KDF(KDF),
 }
 
 impl State {
@@ -48,11 +54,16 @@ impl State {
         self.iterations = iterations;
     }
 
+    fn set_kdf(&mut self, kdf: KDF) {
+        self.kdf = kdf;
+    }
+
     pub fn update(&mut self, updatemsg: UpdateMsg) {
         match updatemsg {
             UpdateMsg::Hash(hash) => self.set_hash(hash),
             UpdateMsg::Cipher(cipher) => self.set_cipher(cipher),
             UpdateMsg::Iterations(iterations) => self.set_iterations(iterations),
+            UpdateMsg::KDF(kdf) => self.set_kdf(kdf),
         }
     }
 
@@ -63,6 +74,7 @@ impl State {
                     self.cipher,
                     self.hash,
                     self.iterations,
+                    self.kdf,
                     key,
                     &plaintext.into_bytes(),
                 ) {
@@ -87,9 +99,14 @@ impl State {
                 None
             }
             Action::Decrypt(key, content) => {
-                if let Ok(plain_utf8) =
-                    crypto::decrypt(self.cipher, self.hash, self.iterations, key, content)
-                {
+                if let Ok(plain_utf8) = crypto::decrypt(
+                    self.cipher,
+                    self.hash,
+                    self.iterations,
+                    self.kdf,
+                    key,
+                    content,
+                ) {
                     if let Ok(plaintext) = String::from_utf8(plain_utf8) {
                         return Some(editor::Action::UpdateTextView(plaintext));
                     }
@@ -106,6 +123,13 @@ pub trait Updater {
 
 impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} | {} | {}", self.cipher, self.hash, self.iterations)
+        match self.kdf {
+            KDF::ARGON2 => write!(f, "{} | {} | {}", self.cipher, self.iterations, self.kdf),
+            _ => write!(
+                f,
+                "{} | {} | {} | {}",
+                self.cipher, self.hash, self.iterations, self.kdf
+            ),
+        }
     }
 }

@@ -1,7 +1,7 @@
-use std::fmt;
-use string::StaticStr;
 use state::UpdateMsg;
 use state::Updater;
+use std::fmt;
+use string::StaticStr;
 
 #[derive(Copy, Clone)]
 pub enum Hash {

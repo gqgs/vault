@@ -1,3 +1,4 @@
+use argon2;
 use cryptolib::blake2b::Blake2b;
 use cryptolib::blake2s::Blake2s;
 use cryptolib::buffer::{BufferResult, ReadBuffer, WriteBuffer};
@@ -11,6 +12,7 @@ use rand::{thread_rng, RngCore};
 use state::cipher::Cipher;
 use state::hash::Hash;
 use state::iterations::Iterations;
+use state::kdf::{KDFCost, KDF};
 
 #[inline]
 fn xor(v1: &[u8], v2: &[u8], res: &mut [u8]) {
@@ -50,6 +52,7 @@ pub fn encrypt(
     cipher: Cipher,
     hash: Hash,
     iterations: Iterations,
+    kdf: KDF,
     key: String,
     plaintext: &[u8],
 ) -> Result<([u8; 16], Vec<u8>), symmetriccipher::SymmetricCipherError> {
@@ -58,7 +61,7 @@ pub fn encrypt(
     let mut derived_key: [u8; 48] = [0; 48]; // 384bits
 
     rng.fill_bytes(&mut salt);
-    hmac_digest_all(hash, key, &salt, iterations, &mut derived_key);
+    derive_key(hash, kdf, key, &salt, iterations, &mut derived_key);
 
     let mut iv: [u8; 16] = [0; 16];
     xor(&salt, &derived_key[0..16], &mut iv);
@@ -84,6 +87,7 @@ pub fn decrypt(
     cipher: Cipher,
     hash: Hash,
     iterations: Iterations,
+    kdf: KDF,
     key: String,
     data: Vec<u8>,
 ) -> Result<Vec<u8>, symmetriccipher::SymmetricCipherError> {
@@ -91,7 +95,7 @@ pub fn decrypt(
     assert!(data.len() > 16);
     let (salt, ciphertext) = data.split_at(16);
 
-    hmac_digest_all(hash, key, salt, iterations, &mut derived_key);
+    derive_key(hash, kdf, key, salt, iterations, &mut derived_key);
 
     let mut iv: [u8; 16] = [0; 16];
     xor(&salt, &derived_key[0..16], &mut iv);
@@ -120,27 +124,52 @@ macro_rules! hmac_digest {
     }};
 }
 
-fn hmac_digest_all(
+fn derive_key(
     hash: Hash,
+    kdf: KDF,
     key: String,
     salt: &[u8],
     iterations: Iterations,
     derived_key: &mut [u8],
 ) {
-    let iter = match iterations {
-        Iterations::LOW => 10_000,
-        Iterations::MEDIUM => 100_000,
-        Iterations::HIGH => 1_000_000,
-    };
-    match hash {
-        Hash::RIPEMD160 => hmac_digest!(Ripemd160::new(), key, salt, iter, derived_key),
-        Hash::BLAKE2S => hmac_digest!(Blake2s::new(32), key, salt, iter, derived_key), // 256bits
-        Hash::BLAKE2B => hmac_digest!(Blake2b::new(64), key, salt, iter, derived_key), // 512bits
-        Hash::SHA2_256 => hmac_digest!(Sha256::new(), key, salt, iter, derived_key),
-        Hash::SHA2_384 => hmac_digest!(Sha384::new(), key, salt, iter, derived_key),
-        Hash::SHA2_512 => hmac_digest!(Sha512::new(), key, salt, iter, derived_key),
-        Hash::SHA3_256 => hmac_digest!(Sha3::new(Sha3Mode::Sha3_256), key, salt, iter, derived_key),
-        Hash::SHA3_384 => hmac_digest!(Sha3::new(Sha3Mode::Sha3_384), key, salt, iter, derived_key),
-        Hash::SHA3_512 => hmac_digest!(Sha3::new(Sha3Mode::Sha3_512), key, salt, iter, derived_key),
+    match kdf.cost(iterations) {
+        KDFCost::PBKDF2(iter) => {
+            match hash {
+                Hash::RIPEMD160 => hmac_digest!(Ripemd160::new(), key, salt, iter, derived_key),
+                Hash::BLAKE2S => hmac_digest!(Blake2s::new(32), key, salt, iter, derived_key), // 256bits
+                Hash::BLAKE2B => hmac_digest!(Blake2b::new(64), key, salt, iter, derived_key), // 512bits
+                Hash::SHA2_256 => hmac_digest!(Sha256::new(), key, salt, iter, derived_key),
+                Hash::SHA2_384 => hmac_digest!(Sha384::new(), key, salt, iter, derived_key),
+                Hash::SHA2_512 => hmac_digest!(Sha512::new(), key, salt, iter, derived_key),
+                Hash::SHA3_256 => {
+                    hmac_digest!(Sha3::new(Sha3Mode::Sha3_256), key, salt, iter, derived_key)
+                }
+                Hash::SHA3_384 => {
+                    hmac_digest!(Sha3::new(Sha3Mode::Sha3_384), key, salt, iter, derived_key)
+                }
+                Hash::SHA3_512 => {
+                    hmac_digest!(Sha3::new(Sha3Mode::Sha3_512), key, salt, iter, derived_key)
+                }
+            }
+        }
+        KDFCost::ARGON2(mem_cost, time_cost) => {
+            let config = argon2::Config {
+                variant: argon2::Variant::Argon2d,
+                version: argon2::Version::Version13,
+                mem_cost,
+                time_cost,
+                lanes: 4,
+                thread_mode: argon2::ThreadMode::Parallel,
+                secret: &[],
+                ad: &[],
+                hash_length: 48,
+            };
+
+            let hash = argon2::hash_encoded(key.as_bytes(), salt, &config).unwrap();
+            let bytes = hash.as_bytes();
+            for i in 0..48 {
+                derived_key[i] = bytes[i];
+            }
+        }
     }
 }

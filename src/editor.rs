@@ -15,6 +15,7 @@ use std::rc::Rc;
 use state::cipher::Cipher;
 use state::hash::Hash;
 use state::iterations::Iterations;
+use state::kdf::KDF;
 
 use config;
 use state;
@@ -42,6 +43,7 @@ macro_rules! close_handler {
 }
 
 pub enum Action {
+    // update text
     UpdateTextView(String),
 }
 
@@ -149,6 +151,13 @@ impl Editor {
 
         hash.set_submenu(Some(&hashmenu));
         menu.append(&hash);
+
+        let kdfmenu = Menu::new();
+        let kdf = MenuItem::with_label("KDF");
+        kdfmenu.append(&self.new_menu_item(KDF::PBKDF2));
+        kdfmenu.append(&self.new_menu_item(KDF::ARGON2));
+        kdf.set_submenu(Some(&kdfmenu));
+        menu.append(&kdf);
 
         let text_buffer = TextBuffer::new(None::<&TextTagTable>);
         let text_view = TextView::with_buffer(&text_buffer);
