@@ -16,32 +16,62 @@ use state::kdf::{KDFCost, KDF};
 
 #[cfg(test)]
 mod tests {
+    macro_rules! encrypt_decrypt {
+        ($cipher:ident, $hash:ident, $cost: ident, $kdf: ident, $pass: expr, $plaintext: expr) => {{
+            println!("testing: {} {} {} {}", $cipher, $hash, $cost, $kdf);
+            let (salt, ciphertext) =
+                encrypt($cipher, $hash, $cost, $kdf, $pass, $plaintext).unwrap();
+            let mut c: std::vec::Vec<u8> = std::vec::Vec::new();
+            c.append(&mut salt[..].to_vec());
+            c.extend(ciphertext);
+            let res = decrypt($cipher, $hash, $cost, $kdf, $pass, c).unwrap();
+            assert_eq!(&res.as_slice(), $plaintext);
+        }};
+    }
+
     use super::*;
     #[test]
-    fn test_encrypt() {
+    fn test_pbkdf2_encryption() {
+        let cost = Cost::LOW;
+        let kdf = KDF::PBKDF2;
         for cipher in vec![Cipher::AESCBC, Cipher::CHACHA20, Cipher::SALSA20] {
-            for hash in vec![Hash::RIPEMD160, Hash::BLAKE2B, Hash::BLAKE2S] {
-                for cost in vec![Cost::LOW] {
-                    for kdf in vec![KDF::PBKDF2, KDF::ARGON2] {
-                        println!("testing: {} {} {} {}", cipher, hash, cost, kdf);
-                        let (salt, ciphertext) = encrypt(
-                            cipher,
-                            hash,
-                            cost,
-                            kdf,
-                            String::from("hello"),
-                            &"secret".as_bytes(),
-                        )
-                        .unwrap();
-                        let mut c: std::vec::Vec<u8> = std::vec::Vec::new();
-                        c.append(&mut salt[..].to_vec());
-                        c.extend(ciphertext);
-                        let res =
-                            decrypt(cipher, hash, cost, kdf, String::from("hello"), c).unwrap();
-                        assert_eq!(&res.as_slice(), &"secret".as_bytes());
-                    }
-                }
+            for hash in vec![
+                Hash::RIPEMD160,
+                Hash::BLAKE2B,
+                Hash::BLAKE2S,
+                Hash::SHA2_256,
+                Hash::SHA2_384,
+                Hash::SHA2_512,
+                Hash::SHA3_256,
+                Hash::SHA3_384,
+                Hash::SHA3_512,
+            ] {
+                encrypt_decrypt!(
+                    cipher,
+                    hash,
+                    cost,
+                    kdf,
+                    String::from("hello"),
+                    &"secret".as_bytes()
+                );
             }
+        }
+    }
+
+    #[test]
+    fn test_argon2_encryption() {
+        let cost = Cost::LOW;
+        let hash = Default::default();
+        let kdf = KDF::ARGON2;
+        for cipher in vec![Cipher::AESCBC, Cipher::CHACHA20, Cipher::SALSA20] {
+            encrypt_decrypt!(
+                cipher,
+                hash,
+                cost,
+                kdf,
+                String::from("hello"),
+                &"secret".as_bytes()
+            );
         }
     }
 }

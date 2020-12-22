@@ -53,8 +53,8 @@ impl KDF {
                 Cost::HIGH => KDFCost::PBKDF2(1_000_000),
             },
             KDF::ARGON2 => match cost {
-                Cost::LOW => KDFCost::ARGON2(u32::pow(2, 10), 2),
-                Cost::MEDIUM => KDFCost::ARGON2(u32::pow(2, 20), 5),
+                Cost::LOW => KDFCost::ARGON2(u32::pow(2, 16), 6),
+                Cost::MEDIUM => KDFCost::ARGON2(u32::pow(2, 20), 8),
                 Cost::HIGH => KDFCost::ARGON2(u32::pow(2, 22), 10),
             },
         }
